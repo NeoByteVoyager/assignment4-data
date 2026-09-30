@@ -35,9 +35,6 @@ def extract_wiki_urls(shard: str) -> list[str]:
         r"(?=[.:?\-]*(?:[^\w/#~:.?+=&%@!\-.:?\-]|$))"
     )
 
-    # -------------------------
-    # Download Wikipedia shard
-    # -------------------------
     print(f"[wiki] downloading {shard}", flush=True)
 
     url = f"https://dumps.wikimedia.org/enwiki/{dump_date}/{shard}"
@@ -53,19 +50,11 @@ def extract_wiki_urls(shard: str) -> list[str]:
         with open(dump, "wb") as f:
             shutil.copyfileobj(response, f)
 
-    # -------------------------
-    # Extract external URLs
-    # -------------------------
     urls = []
 
     with bz2.open(dump, "rt", errors="ignore") as f:
         for line in f:
-            refs = re.search(
-                r"&lt;ref&gt;(.*)&lt;/ref&gt;",
-                line,
-            )
-
-            if refs:
+            if refs := re.search(r"&lt;ref&gt;(.*)&lt;/ref&gt;", line):
                 urls.extend(url_re.findall(refs.group(0)))
 
     dump.unlink(missing_ok=True)
@@ -82,10 +71,7 @@ def download_offline_files(*, root_path: Path) -> None:
     paloma_out = root_path / "tokenized_paloma_c4_100_domains_validation.bin"
 
     if not paloma_out.exists():
-        print(
-            f"[huggingface] downloading {paloma_out.name}",
-            flush=True,
-        )
+        print(f"[huggingface] downloading {paloma_out.name}", flush=True)
 
         urllib.request.urlretrieve(
             "https://huggingface.co/datasets/brunborg/cs336-a4/"
@@ -160,9 +146,6 @@ def main(offline_only: bool = False):
     if offline_only:
         return
 
-    # -------------------------
-    # Get Wikipedia shard list
-    # -------------------------
     dump_date = "20260501"
     base_url = f"https://dumps.wikimedia.org/enwiki/{dump_date}/"
 
@@ -186,11 +169,13 @@ def main(offline_only: bool = False):
         )
     )
 
-    print(f"[wiki] found {len(shards)} shards", flush=True)
+    selected_shards = shards[:2]
 
-    # -------------------------
-    # Extract Wikipedia URLs
-    # -------------------------
+    print(
+        f"[wiki] found {len(shards)} shards, using {len(selected_shards)}",
+        flush=True,
+    )
+
     wiki_out = (
         root_path
         / "wiki/enwiki-20260501-extracted_urls.txt.gz"
@@ -206,19 +191,17 @@ def main(offline_only: bool = False):
         tmp_out.unlink(missing_ok=True)
 
         print(
-            f"[wiki] extracting {len(shards)} shards",
+            f"[wiki] extracting {len(selected_shards)} shards",
             flush=True,
         )
 
-        # Important:
-        # generator instead of list comprehension on Kaggle/local
         if modal.is_local():
             results = (
                 extract_wiki_urls.local(shard)
-                for shard in shards
+                for shard in selected_shards
             )
         else:
-            results = extract_wiki_urls.map(shards)
+            results = extract_wiki_urls.map(selected_shards)
 
         with gzip.open(tmp_out, "wt") as f:
             for urls in results:
@@ -233,9 +216,6 @@ def main(offline_only: bool = False):
             flush=True,
         )
 
-    # -------------------------
-    # Common Crawl WET files
-    # -------------------------
     english_wet_files = EnglishWetFiles()
     wet_file_paths = english_wet_files.load_or_create()
 
