@@ -12,110 +12,237 @@ from cs336_data.modal_utils import VOLUME_MOUNTS, app, build_image
 from cs336_data.wet_files import EnglishWetFiles
 
 
-@app.function(image=build_image(), volumes=VOLUME_MOUNTS, timeout=60 * 60 * 12, max_containers=128)
+USER_AGENT = "Mozilla/5.0"
+
+
+@app.function(
+    image=build_image(),
+    volumes=VOLUME_MOUNTS,
+    timeout=60 * 60 * 12,
+    max_containers=128,
+)
 def extract_wiki_urls(shard: str) -> list[str]:
     dump_date = "20260501"
+
     tmp_dir = Path("/tmp/wiki")
     tmp_dir.mkdir(parents=True, exist_ok=True)
+
     dump = tmp_dir / shard
+
     url_re = re.compile(
-        r"\b(?:https?|telnet|gopher|file|wais|ftp):[\w/#~:.?+=&%@!\-.:?\\-]+?(?=[.:?\-]*(?:[^\w/#~:.?+=&%@!\-.:?\-]|$))"
+        r"\b(?:https?|telnet|gopher|file|wais|ftp):"
+        r"[\w/#~:.?+=&%@!\-.:?\\-]+?"
+        r"(?=[.:?\-]*(?:[^\w/#~:.?+=&%@!\-.:?\-]|$))"
     )
 
+    # -------------------------
+    # Download Wikipedia shard
+    # -------------------------
     print(f"[wiki] downloading {shard}", flush=True)
-    urllib.request.urlretrieve(f"https://dumps.wikimedia.org/enwiki/{dump_date}/{shard}", dump)
+
+    url = f"https://dumps.wikimedia.org/enwiki/{dump_date}/{shard}"
+
+    request = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": USER_AGENT,
+        },
+    )
+
+    with urllib.request.urlopen(request, timeout=120) as response:
+        with open(dump, "wb") as f:
+            shutil.copyfileobj(response, f)
+
+    # -------------------------
+    # Extract external URLs
+    # -------------------------
     urls = []
+
     with bz2.open(dump, "rt", errors="ignore") as f:
         for line in f:
-            if refs := re.search("&lt;ref&gt(.*)&lt;/ref&gt;", line):
+            refs = re.search(
+                r"&lt;ref&gt;(.*)&lt;/ref&gt;",
+                line,
+            )
+
+            if refs:
                 urls.extend(url_re.findall(refs.group(0)))
+
     dump.unlink(missing_ok=True)
+
+    print(
+        f"[wiki] extracted {len(urls)} urls from {shard}",
+        flush=True,
+    )
+
     return urls
 
 
 def download_offline_files(*, root_path: Path) -> None:
     paloma_out = root_path / "tokenized_paloma_c4_100_domains_validation.bin"
+
     if not paloma_out.exists():
-        print(f"[huggingface] downloading {paloma_out.name}", flush=True)
+        print(
+            f"[huggingface] downloading {paloma_out.name}",
+            flush=True,
+        )
+
         urllib.request.urlretrieve(
-            "https://huggingface.co/datasets/brunborg/cs336-a4/resolve/main/tokenized_paloma_c4_100_domains_validation.bin",
+            "https://huggingface.co/datasets/brunborg/cs336-a4/"
+            "resolve/main/tokenized_paloma_c4_100_domains_validation.bin",
             paloma_out,
         )
 
     cc = root_path / "CC"
     cc.mkdir(parents=True, exist_ok=True)
-    for kind, out_name in [("warc", "example.warc.gz"), ("wet", "example.warc.wet.gz")]:
+
+    for kind, out_name in [
+        ("warc", "example.warc.gz"),
+        ("wet", "example.warc.wet.gz"),
+    ]:
         out = cc / out_name
+
         if not out.exists():
             print(f"[cc] downloading {out_name}", flush=True)
+
             with urllib.request.urlopen(
-                f"https://data.commoncrawl.org/crawl-data/CC-MAIN-2026-12/{kind}.paths.gz"
+                f"https://data.commoncrawl.org/"
+                f"crawl-data/CC-MAIN-2026-12/{kind}.paths.gz"
             ) as r:
-                first_path = gzip.decompress(r.read()).decode().splitlines()[0]
-            urllib.request.urlretrieve(f"https://data.commoncrawl.org/{first_path}", out)
+                first_path = (
+                    gzip.decompress(r.read())
+                    .decode()
+                    .splitlines()[0]
+                )
+
+            urllib.request.urlretrieve(
+                f"https://data.commoncrawl.org/{first_path}",
+                out,
+            )
 
     for rel_path, url in [
         (
             "classifiers/lid.176.bin",
-            "https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin",
+            "https://dl.fbaipublicfiles.com/fasttext/"
+            "supervised-models/lid.176.bin",
         ),
         (
             "classifiers/dolma_fasttext_hatespeech_jigsaw_model.bin",
-            "https://huggingface.co/allenai/dolma-jigsaw-fasttext-bigrams-hatespeech/resolve/main/model.bin",
+            "https://huggingface.co/allenai/"
+            "dolma-jigsaw-fasttext-bigrams-hatespeech/"
+            "resolve/main/model.bin",
         ),
         (
             "classifiers/dolma_fasttext_nsfw_jigsaw_model.bin",
-            "https://huggingface.co/allenai/dolma-jigsaw-fasttext-bigrams-nsfw/resolve/main/model.bin",
+            "https://huggingface.co/allenai/"
+            "dolma-jigsaw-fasttext-bigrams-nsfw/"
+            "resolve/main/model.bin",
         ),
     ]:
         out = root_path / rel_path
         out.parent.mkdir(parents=True, exist_ok=True)
+
         if not out.exists():
             print(f"[file] downloading {rel_path}", flush=True)
             urllib.request.urlretrieve(url, out)
 
 
-@app.function(image=build_image(), volumes=VOLUME_MOUNTS, timeout=60 * 60 * 12)
+@app.function(
+    image=build_image(),
+    volumes=VOLUME_MOUNTS,
+    timeout=60 * 60 * 12,
+)
 def main(offline_only: bool = False):
     root_path = get_shared_assets_path()
+
     download_offline_files(root_path=root_path)
+
     if offline_only:
         return
 
+    # -------------------------
+    # Get Wikipedia shard list
+    # -------------------------
     dump_date = "20260501"
     base_url = f"https://dumps.wikimedia.org/enwiki/{dump_date}/"
+
     request = urllib.request.Request(
         base_url,
         headers={
-            "User-Agent": "Mozilla/5.0"
-        }
+            "User-Agent": USER_AGENT,
+        },
     )
 
-    html = urllib.request.urlopen(request).read().decode()
+    with urllib.request.urlopen(request, timeout=30) as response:
+        html = response.read().decode("utf-8")
+
     shards = sorted(
-        set(re.findall(rf"enwiki-{dump_date}-pages-articles-multistream[0-9]+\.xml-p[0-9]+p[0-9]+\.bz2", html))
+        set(
+            re.findall(
+                rf"enwiki-{dump_date}-pages-articles-"
+                rf"multistream[0-9]+\.xml-p[0-9]+p[0-9]+\.bz2",
+                html,
+            )
+        )
     )
-    wiki_out = root_path / "wiki/enwiki-20260501-extracted_urls.txt.gz"
+
+    print(f"[wiki] found {len(shards)} shards", flush=True)
+
+    # -------------------------
+    # Extract Wikipedia URLs
+    # -------------------------
+    wiki_out = (
+        root_path
+        / "wiki/enwiki-20260501-extracted_urls.txt.gz"
+    )
+
     if not wiki_out.exists():
-        wiki_out.parent.mkdir(parents=True, exist_ok=True)
+        wiki_out.parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
         tmp_out = Path("/tmp") / wiki_out.name
         tmp_out.unlink(missing_ok=True)
-        print(f"[wiki] extracting {len(shards)} shards", flush=True)
+
+        print(
+            f"[wiki] extracting {len(shards)} shards",
+            flush=True,
+        )
+
+        # Important:
+        # generator instead of list comprehension on Kaggle/local
+        if modal.is_local():
+            results = (
+                extract_wiki_urls.local(shard)
+                for shard in shards
+            )
+        else:
+            results = extract_wiki_urls.map(shards)
+
         with gzip.open(tmp_out, "wt") as f:
-            for urls in (
-                [extract_wiki_urls.local(shard) for shard in shards]
-                if modal.is_local()
-                else extract_wiki_urls.map(shards)
-            ):
+            for urls in results:
                 for url in urls:
                     f.write(url + "\n")
+
         shutil.copy2(tmp_out, wiki_out)
         tmp_out.unlink(missing_ok=True)
-        print(f"[wiki] wrote {wiki_out}", flush=True)
 
+        print(
+            f"[wiki] wrote {wiki_out}",
+            flush=True,
+        )
+
+    # -------------------------
+    # Common Crawl WET files
+    # -------------------------
     english_wet_files = EnglishWetFiles()
     wet_file_paths = english_wet_files.load_or_create()
-    print(f"downloaded {len(wet_file_paths)} including {wet_file_paths[0]=}")
+
+    print(
+        f"downloaded {len(wet_file_paths)} "
+        f"including {wet_file_paths[0]=}"
+    )
 
 
 @app.local_entrypoint()
@@ -127,10 +254,19 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
+
     parser.add_argument(
         "--offline-only",
         action="store_true",
-        help="Only download files needed for running the assignment offline; skip full WET/wiki data creation.",
+        help=(
+            "Only download files needed for running "
+            "the assignment offline; skip full "
+            "WET/wiki data creation."
+        ),
     )
+
     args = parser.parse_args()
-    main.local(offline_only=args.offline_only)
+
+    main.local(
+        offline_only=args.offline_only
+    )
