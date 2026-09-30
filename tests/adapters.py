@@ -1,5 +1,10 @@
 from __future__ import annotations
-from cs336_data import extract_content,predict_language, mask_ip, mask_phone, mask_email, detect_nsfw, detect_toxic, gopher_quality_filter
+from cs336_data.filtering.extract_context import extract_content
+from cs336_data.filtering.language_identification import predict_language
+from cs336_data.filtering.mask_pii import mask_email, mask_phone, mask_ip
+from cs336_data.filtering.gopher_quality_filters import gopher_quality_filter
+from cs336_data.filtering.harmful_content import detect_nsfw, detect_toxic
+from cs336_data.filtering.quality_classifier import predict_quality
 import os
 from typing import Any
 
@@ -34,7 +39,7 @@ def run_classify_toxic_speech(text: str) -> tuple[Any, float]:
 
 
 def run_classify_quality(text: str) -> tuple[Any, float]:
-    raise NotImplementedError
+    return predict_quality(text)
 
 
 def run_gopher_quality_filter(text: str) -> bool:
