@@ -84,7 +84,14 @@ def main(offline_only: bool = False):
 
     dump_date = "20260501"
     base_url = f"https://dumps.wikimedia.org/enwiki/{dump_date}/"
-    html = urllib.request.urlopen(base_url).read().decode()
+    request = urllib.request.Request(
+        base_url,
+        headers={
+            "User-Agent": "Mozilla/5.0"
+        }
+    )
+
+    html = urllib.request.urlopen(request).read().decode()
     shards = sorted(
         set(re.findall(rf"enwiki-{dump_date}-pages-articles-multistream[0-9]+\.xml-p[0-9]+p[0-9]+\.bz2", html))
     )
