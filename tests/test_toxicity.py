@@ -14,7 +14,7 @@ def test_classify_nsfw():
     )
     # TODO: you may have to change this check below, depending on what your
     # NSFW classifier system returns.
-    assert prediction == "nsfw"
+    assert prediction == "__label__nsfw"
     assert isinstance(score, float)
     assert score > 0
 
@@ -25,7 +25,7 @@ def test_classify_nsfw():
     )
     # TODO: you may have to change this check below, depending on what your
     # NSFW classifier system returns.
-    assert prediction == "non-nsfw"
+    assert prediction == "__label__non-nsfw"
     assert isinstance(score, float)
     assert score > 0
 
@@ -41,7 +41,7 @@ def test_classify_toxic_speech():
     )
     # TODO: you may have to change this check below, depending on what your
     # hate-speech classifier system returns.
-    assert prediction == "toxic"
+    assert prediction == "__label__toxic"
     assert isinstance(score, float)
     assert score > 0
 
@@ -52,6 +52,6 @@ def test_classify_toxic_speech():
     )
     # TODO: you may have to change this check below, depending on what your
     # hate-speech classifier system returns.
-    assert prediction == "non-toxic"
+    assert prediction == "__label__non-toxic"
     assert isinstance(score, float)
     assert score > 0
