@@ -3,9 +3,12 @@ import regex as re
 from cs336_data.filtering.extract_context import extract_content
 from fastwarc import ArchiveIterator
 
-model = fasttext.load_model("local-shared-data/classifiers/lid.176.bin")
+model = None
 
 def predict_language(sentence):
+    global model
+    if model is None:
+        model = fasttext.load_model("local-shared-data/classifiers/lid.176.bin")
     sentence = re.sub("\\n", "", sentence)
     label, prob = model.predict(sentence)
     return label[0], prob[0]

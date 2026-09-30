@@ -3,9 +3,12 @@ import regex as re
 from fastwarc import ArchiveIterator
 from cs336_data.filtering.extract_context import extract_content
 
-model = fasttext.load_model("outputs/quality_classifier.bin")
+model = None
 
 def predict_quality(text: str):
+    global model
+    if model is None:
+        fasttext.load_model("local-shared-data/classifiers/lid.176.bin")
     text = re.sub("\n", "", text)
     labels, scores = model.predict(text)
     return labels[0], scores[0]
