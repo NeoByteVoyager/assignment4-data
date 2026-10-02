@@ -16,16 +16,17 @@ def train_model(
     )
 
     model.save_model(classifier_dir)
-
+    return model
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--train_data', type=str, required=True)
-    parser.add_argument('--classifier_dir', type=str, default="outputs/quality_classifier.bin")
-    parser.add_argument('--lr', type=float, default=0.1)
-    parser.add_argument('--epoch', type=int, default=5)
+    parser.add_argument('--train_data', type=str, required=False, default="local-shared-data/quality_train.txt")
+    parser.add_argument('--val_data', type=str, required=False, default="local-shared-data/quality_val.txt")
+    parser.add_argument('--classifier_dir', type=str, required=False, default="outputs/quality_classifier.bin")
+    parser.add_argument('--lr', type=float, required=False, default=0.1)
+    parser.add_argument('--epoch', type=int, required=False,default=5)
 
     args = parser.parse_args()
 
@@ -34,4 +35,6 @@ if __name__ == "__main__":
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
 
-    train_model(train_data=args.train_data, classifier_dir=args.classifier_dir, lr=args.lr, epoch=args.epoch)
+    model = train_model(train_data=args.train_data, classifier_dir=args.classifier_dir, lr=args.lr, epoch=args.epoch)
+
+    print(model.test(args.val_data))

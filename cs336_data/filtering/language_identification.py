@@ -28,5 +28,5 @@ if __name__ == "__main__":
             if i > 20:
                 break
     '''
-    label = predict_language("你真的很nice，good, beautiful")
+    label = predict_language("hello girl, you are so beautiful")
     print(label)
