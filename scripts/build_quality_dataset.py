@@ -1,8 +1,6 @@
 import random
 import argparse
 from fastwarc import ArchiveIterator, WarcRecordType
-from idna import valid_label_length
-
 from cs336_data.filtering.extract_context import extract_content
 from resiliparse.parse.encoding import detect_encoding
 from cs336_data.filtering.language_identification import predict_language

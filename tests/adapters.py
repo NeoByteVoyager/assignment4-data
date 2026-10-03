@@ -7,8 +7,8 @@ from cs336_data.filtering.harmful_content import detect_nsfw, detect_toxic
 from cs336_data.filtering.quality_classifier import predict_quality
 import os
 from typing import Any
-
-
+from cs336_data.deduplicate.exact_deduplication import exact_line_deduplication
+from cs336_data.deduplicate.minihash_deduplication import minihash_deduplication
 
 def run_extract_text_from_html_bytes(html_bytes: bytes) -> str | None:
     return extract_content(html_bytes)
@@ -49,7 +49,7 @@ def run_gopher_quality_filter(text: str) -> bool:
 def run_exact_line_deduplication(
     input_files: list[os.PathLike], output_directory: os.PathLike
 ):
-    raise NotImplementedError
+    return exact_line_deduplication(input_files, output_directory)
 
 
 def run_minhash_deduplication(
@@ -60,4 +60,4 @@ def run_minhash_deduplication(
     jaccard_threshold: float,
     output_directory: os.PathLike,
 ):
-    raise NotImplementedError
+    return minihash_deduplication(input_files, num_bands, num_bands, ngrams, jaccard_threshold, output_directory)
